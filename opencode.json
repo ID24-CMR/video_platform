@@ -1,0 +1,35 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md",
+    ".opencode/instructions/*.md"
+  ],
+  "permission": {
+    "edit": "ask",
+    "bash": {
+      "*": "ask",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "ls*": "allow",
+      "cat*": "allow",
+      "grep*": "allow",
+      "python manage.py check*": "allow",
+      "python manage.py makemigrations --check*": "allow",
+      "python manage.py makemigrations --dry-run*": "allow",
+      "python manage.py showmigrations*": "allow",
+      "python manage.py sqlmigrate*": "allow",
+      "pytest*": "allow",
+      "ruff*": "allow",
+      "mypy*": "allow",
+      "pip list*": "allow",
+      "pip install*": "ask",
+      "python manage.py migrate*": "ask",
+      "python manage.py flush*": "deny",
+      "python manage.py dbshell*": "ask",
+      "git push*": "ask",
+      "git reset --hard*": "deny",
+      "rm -rf*": "deny"
+    }
+  }
+}
