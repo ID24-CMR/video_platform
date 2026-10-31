@@ -8,7 +8,7 @@
 <a href="href="https://github.com/ID24-CMR/video_platform/BUILD" title="Open build"><img src="https://img.shields.io/github/languages/code-size/ID24-CMR/video_platform"></a>
 <a href="href="https://github.com/ID24-CMR/video_platform/BUILD" title="Open build"><img src="https://img.shields.io/github/repo-size/ID24-CMR/video_platform"></a>
 <a> <img src="https://img.shields.io/github/issues-closed/ID24-CMR/video_platform"></a>
-[![VideoHub CI](https://github.com/ID24-CMR/video_platform/actions/workflows/ci.yml/badge.svg)](https://github.com/ID24-CMR/video_platform/actions/workflows/ci.yml)
+<a title="VideoHub CI" href="https://github.com/ID24-CMR/video_platform/actions/workflows/ci.yml/badge.svg"><img src="https://github.com/ID24-CMR/video_platform/actions/workflows/ci.yml"></a>
 </p>
 <p align="center">
     <a href="#development">Development</a>.
