@@ -1,14 +1,23 @@
-name: Release
+name: VideoHub Release
 
 on:
   push:
     tags:
       - "v*"
+
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    env:
+      DJANGO_SECRET_KEY: test-secret-key-for-ci-only
+      DEBUG: "False"
+      ALLOWED_HOSTS: localhost,127.0.0.1
 
     steps:
       - name: Check out repository
@@ -22,17 +31,15 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          fi
+          pip install -r requirements.txt
 
-      - name: Run tests
+      - name: Check Django configuration
         run: |
-          if [ -f "pytest.ini" ] || [ -d "tests" ]; then
-            pytest
-          else
-            echo "No test suite configured; skipping pytest."
-          fi
+          python manage.py check
+
+      - name: Run Django tests
+        run: |
+          python manage.py test
 
       - name: Create GitHub release
         if: startsWith(github.ref, 'refs/tags/')
@@ -41,5 +48,3 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
