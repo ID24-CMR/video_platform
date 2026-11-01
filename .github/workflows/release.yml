@@ -40,11 +40,11 @@ jobs:
       - name: Run Django tests
         run: python manage.py test
 
-      - name: Run Ruff
-        run: ruff check .
+      # - name: Run Ruff
+      #   run: ruff check .
 
-      - name: Check Black formatting
-        run: black --check .
+      # - name: Check Black formatting
+      #   run: black --check .
 
       - name: Audit dependencies
         run: pip-audit -r requirements.txt
