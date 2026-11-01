@@ -1,0 +1,50 @@
+name: VideoHub Security
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependency-audit:
+    name: Python Dependency Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pip-audit
+        run: python -m pip install pip-audit
+
+      - name: Audit dependencies
+        run: pip-audit -r requirements.txt
+
+  codeql:
+    name: CodeQL Security Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: python
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
