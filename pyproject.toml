@@ -1,0 +1,24 @@
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+exclude = '''
+/(
+    migrations
+    | staticfiles
+    | venv
+    | .venv
+)/
+'''
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+exclude = [
+    "migrations",
+    "staticfiles",
+    "venv",
+    ".venv",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
