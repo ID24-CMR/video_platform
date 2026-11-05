@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import os
+import sys
 
 import dj_database_url
 from dotenv import load_dotenv
@@ -177,3 +178,8 @@ STRIPE_CURRENCY = os.environ.get(
     "STRIPE_CURRENCY",
     "cad"
 ).lower()
+
+if "test" in sys.argv:
+    STORAGES["staticfiles"] = {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    }
