@@ -47,18 +47,18 @@ Contributors and feedback are encouraged and welcome. For more information about
 ## Contributors
 - ID24-CMR
 ## Repositories
-The following public repositories are currentl available for the School Management System:
+The following public repositories are currently available for the School Management System:
 | Repository		|Description																		|
 | ------------------|-----------------------------------------------------------------------------------|
 |[mtp-documentation]| Project overview, general documentation, and white papers (report)				|
 |[mtp-server]		| Backend implementation for the Google exposure APIs 								|
-|[mtp-verification-server]| Backend Implomentation of the verication process							|
+|[mtp-verification-server]| Backend Implementation of the verification process							|
 
 ## Liecensing
 Copyright (c) 2020 ID24-CMR company.
 Licensed under the **Apache License, Version 2.0** (the "License"); you may not use this file except in compliance with the License.
-You may obtain a copy of the License at linkhere.
-Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" basis, without warranties or condition of any kind, either express or implied. see [LICENSE](./LICENSE) for the specific language governing permisssions and limitations under the License.
+You may obtain a copy of the License at link here.
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" basis, without warranties or condition of any kind, either express or implied. see [LICENSE](./LICENSE) for the specific language governing permissions and limitations under the License.
 
 ## Technologies (IDE) client/server
 # Server Side
@@ -125,4 +125,9 @@ Total pushes: 1
 
 |N° | start   | end   |    push        |		sum	          |
 |---|---------|-------|----------------|----------------------|
+<<<<<<< Updated upstream
 |001|  11/11  | 15/11 | 15             | 2  |
+=======
+|001|  11/11  | 15/11 | 15             | <!-- PUSH_COUNT -->  |
+|002| 16/11   | 22/11 | 25			   |					  |
+>>>>>>> Stashed changes
