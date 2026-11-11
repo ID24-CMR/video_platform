@@ -23,3 +23,4 @@ project documentation.md
 .env
 
 staticfiles/
+private_media/
