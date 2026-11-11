@@ -10,11 +10,7 @@
 <a> <img src="https://img.shields.io/github/issues-closed/ID24-CMR/video_platform"></a>
 <a title="VideoHub CI" href="https://github.com/ID24-CMR/video_platform/actions/workflows/ci.yml/badge.svg"><img src="https://github.com/ID24-CMR/video_platform/actions/workflows/ci.yml"></a>
 </p>
-# Idrice CI/CD Project
 
-## GitHub Push Statistics
-
-Total pushes: 1
 <p align="center">
     <a href="#development">Development</a>.
     <a href="#service-apis">Service APIs</a>.
@@ -118,3 +114,15 @@ video_platform/
 └── media/ 
 
 [![VideoHub CI](https://github.com/ID24-CMR/video_platform/actions/workflows/ci.yml/badge.svg)](https://github.com/ID24-CMR/video_platform/actions/workflows/ci.yml)
+
+
+
+# Idrice CI/CD Project
+
+## GitHub Push Statistics
+
+Total pushes: 1
+
+|N° | start   | end   |    push        |		sum	          |
+|---|---------|-------|----------------|----------------------|
+|001|  11/11  | 15/11 | 15             | <!-- PUSH_COUNT -->  |
