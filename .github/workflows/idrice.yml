@@ -2,8 +2,9 @@ name: Idrice Push Counter
 
 on:
   push:
-    branches:
-      - main
+    branches: [master]
+  pull_request:
+    branches: [master]
 
 permissions:
   contents: write
