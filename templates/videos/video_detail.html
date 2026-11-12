@@ -55,7 +55,13 @@
                         {% if user.is_authenticated %}
 
                             {% if user.is_superuser or video.access_grants.filter %}
-                                <p>Check your account for video access.</p>
+                                <video controls width="100%">
+                                    <source
+                                        src="{% url 'videos:stream_video' video.id %}"
+                                        type="video/mp4"
+                                    >
+                                    Your browser does not support HTML5 video.
+                                </video>
                             {% else %}
                                 <form
                                     method="post"

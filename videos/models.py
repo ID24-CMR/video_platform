@@ -58,6 +58,16 @@ class Video(models.Model):
     class Meta:
         ordering = ["-created_at"]
 
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(access_type="free", price=0)
+                    | models.Q(access_type="paid", price__gt=0)
+                ),
+                name="valid_video_price_by_access_type",
+            ),
+        ]
+
     def clean(self):
         super().clean()
 
@@ -98,7 +108,7 @@ class VideoAccessGrant(models.Model):
 
     video = models.ForeignKey(
         Video,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="access_grants"
     )
 

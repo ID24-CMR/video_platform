@@ -18,6 +18,7 @@ import stripe
 from django.db import IntegrityError, transaction
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_exempt
+from django.core.paginator import Paginator
 
 from .models import (
     Purchase,
@@ -130,8 +131,16 @@ def manage_videos(request):
     if access_type in ["free", "paid"]:
         videos = videos.filter(access_type=access_type)
 
+    # Pagination
+    paginator = Paginator(videos, 5)
+
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
     context = {
-        "videos": videos,
+        "videos": page_obj,
+        "page_obj": page_obj,
+        "paginator": paginator,
         "categories": Category.objects.all(),
         "search_query": search_query,
         "selected_category": category_id,
