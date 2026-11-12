@@ -187,6 +187,33 @@
             </table>
         </div>
     </section>
+    {% if page_obj.paginator.num_pages > 1 %}
+<nav class="pagination" aria-label="Video list pagination">
+
+    {% if page_obj.has_previous %}
+        <a href="?{% if search_query %}q={{ search_query|urlencode }}&{% endif %}{% if selected_category %}category={{ selected_category|urlencode }}&{% endif %}{% if selected_status %}status={{ selected_status|urlencode }}&{% endif %}{% if selected_access_type %}access_type={{ selected_access_type|urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}">
+            Previous
+        </a>
+    {% endif %}
+
+    {% for page_num in page_obj.paginator.page_range %}
+        {% if page_obj.number == page_num %}
+            <span class="current-page" aria-current="page">{{ page_num }}</span>
+        {% else %}
+            <a href="?{% if search_query %}q={{ search_query|urlencode }}&{% endif %}{% if selected_category %}category={{ selected_category|urlencode }}&{% endif %}{% if selected_status %}status={{ selected_status|urlencode }}&{% endif %}{% if selected_access_type %}access_type={{ selected_access_type|urlencode }}&{% endif %}page={{ page_num }}">
+                {{ page_num }}
+            </a>
+        {% endif %}
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+        <a href="?{% if search_query %}q={{ search_query|urlencode }}&{% endif %}{% if selected_category %}category={{ selected_category|urlencode }}&{% endif %}{% if selected_status %}status={{ selected_status|urlencode }}&{% endif %}{% if selected_access_type %}access_type={{ selected_access_type|urlencode }}&{% endif %}page={{ page_obj.next_page_number }}">
+            Next
+        </a>
+    {% endif %}
+
+</nav>
+{% endif %}
 
     <a href="{% url 'videos:admin_dashboard' %}" class="back-link">
         ← Back to dashboard
