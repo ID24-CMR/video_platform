@@ -98,7 +98,7 @@ class VideoAccessGrant(models.Model):
 
     video = models.ForeignKey(
         Video,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="access_grants"
     )
 
