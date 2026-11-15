@@ -111,7 +111,7 @@ video_platform/
 │   ├── js/
 │   └── images/
 │
-└── media/ 
+└── media/
 
 [![VideoHub CI](https://github.com/ID24-CMR/video_platform/actions/workflows/ci.yml/badge.svg)](https://github.com/ID24-CMR/video_platform/actions/workflows/ci.yml)
 
@@ -123,11 +123,4 @@ video_platform/
 
 Total pushes: 1
 
-|N° | start   | end   |    push        |		sum	          |
-|---|---------|-------|----------------|----------------------|
-<<<<<<< Updated upstream
-|001|  11/11  | 15/11 | 15             | 2  |
-=======
-|001|  11/11  | 15/11 | 15             | 4  |
-|002| 16/11   | 22/11 | 25			   |					  |
->>>>>>> Stashed changes
+

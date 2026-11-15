@@ -55,13 +55,24 @@
                         {% if user.is_authenticated %}
 
                             {% if user.is_superuser or video.access_grants.filter %}
-                                <video controls width="100%">
-                                    <source
-                                        src="{% url 'videos:stream_video' video.id %}"
-                                        type="video/mp4"
-                                    >
-                                    Your browser does not support HTML5 video.
-                                </video>
+                        <div class="video-player-container">
+
+            
+                            <video id="videoPlayer" controls width="100%" preload="metadata">
+                                <source
+                                    src="{% url 'videos:stream_video' video.id %}"
+                                    type="video/mp4"
+                                >
+                                Your browser does not support HTML5 video.
+                            </video>
+
+                            <div class="video-seek-controls">
+                                <button type="button" id="rewindButton">⏪ -10 seconds</button>
+                                <button type="button" id="forwardButton">+10 seconds ⏩</button>
+                            </div>
+
+                        </div>
+
                             {% else %}
                                 <form
                                     method="post"
@@ -122,6 +133,6 @@
 <footer class="site-footer">
     <p>&copy; {% now "Y" %} VideoHub. All rights reserved.</p>
 </footer>
-
+<script src="{% static 'js/video_detail.js' %}"></script>
 </body>
 </html>
