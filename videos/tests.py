@@ -5,6 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .models import Category, Video, VideoAccessGrant
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 
 class CategoryModelTests(TestCase):
@@ -345,3 +346,601 @@ class VideoStreamingTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+
+
+class ManageVideosViewTests(TestCase):
+
+    def setUp(self):
+        self.category = Category.objects.create(
+            name="Technology"
+        )
+
+        self.other_category = Category.objects.create(
+            name="Business"
+        )
+
+        self.admin = User.objects.create_superuser(
+            username="video_admin",
+            email="admin@example.com",
+            password="adminpassword123",
+        )
+
+        self.user = User.objects.create_user(
+            username="regular_user",
+            password="userpassword123",
+        )
+
+        # Create 12 videos to test pagination.
+        for i in range(12):
+            Video.objects.create(
+                title=f"Python Tutorial {i}",
+                description=f"Description {i}",
+                category=self.category,
+                access_type="free",
+                price=0,
+                is_published=True,
+            )
+
+        # Additional videos for filter testing.
+        Video.objects.create(
+            title="Advanced Django",
+            description="Advanced Django course",
+            category=self.other_category,
+            access_type="paid",
+            price=Decimal("20.00"),
+            is_published=False,
+        )
+
+    def test_anonymous_user_cannot_access_manage_videos(self):
+        response = self.client.get(
+            reverse("videos:manage_videos")
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_regular_user_cannot_access_manage_videos(self):
+        self.client.login(
+            username="regular_user",
+            password="userpassword123",
+        )
+
+        response = self.client.get(
+            reverse("videos:manage_videos")
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_admin_can_access_manage_videos(self):
+        self.client.login(
+            username="video_admin",
+            password="adminpassword123",
+        )
+
+        response = self.client.get(
+            reverse("videos:manage_videos")
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_video_pagination_displays_ten_videos(self):
+        self.client.login(
+            username="video_admin",
+            password="adminpassword123",
+        )
+
+        response = self.client.get(
+            reverse("videos:manage_videos")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["videos"]), 10)
+        self.assertEqual(
+            response.context["paginator"].count,
+            13,
+        )
+
+    def test_second_page_displays_remaining_videos(self):
+        self.client.login(
+            username="video_admin",
+            password="adminpassword123",
+        )
+
+        response = self.client.get(
+            reverse("videos:manage_videos"),
+            {"page": 2},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["videos"]), 3)
+
+    def test_search_filter_works(self):
+        self.client.login(
+            username="video_admin",
+            password="adminpassword123",
+        )
+
+        response = self.client.get(
+            reverse("videos:manage_videos"),
+            {"q": "Advanced Django"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["videos"]), 1)
+
+    def test_category_filter_works(self):
+        self.client.login(
+            username="video_admin",
+            password="adminpassword123",
+        )
+
+        response = self.client.get(
+            reverse("videos:manage_videos"),
+            {"category": self.other_category.id},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["videos"]), 1)
+
+    def test_published_filter_works(self):
+        self.client.login(
+            username="video_admin",
+            password="adminpassword123",
+        )
+
+        response = self.client.get(
+            reverse("videos:manage_videos"),
+            {"status": "published"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context["paginator"].count,
+            12,
+        )
+        self.assertEqual(len(response.context["videos"]), 10)
+
+    def test_draft_filter_works(self):
+        self.client.login(
+            username="video_admin",
+            password="adminpassword123",
+        )
+
+        response = self.client.get(
+            reverse("videos:manage_videos"),
+            {"status": "draft"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["videos"]), 1)
+
+    def test_paid_filter_works(self):
+        self.client.login(
+            username="video_admin",
+            password="adminpassword123",
+        )
+
+        response = self.client.get(
+            reverse("videos:manage_videos"),
+            {"access_type": "paid"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["videos"]), 1)
+
+
+#this is 5 test for admin side 
+class AdminDashboardAndAddVideoTests(TestCase):
+
+    def setUp(self):
+        self.category = Category.objects.create(
+            name="Technology"
+        )
+
+        self.admin = User.objects.create_superuser(
+            username="dashboard_admin",
+            email="admin@example.com",
+            password="adminpassword123",
+        )
+
+        self.user = User.objects.create_user(
+            username="regular_user",
+            password="userpassword123",
+        )
+
+        # Create published videos.
+        for i in range(3):
+            Video.objects.create(
+                title=f"Published Video {i}",
+                description="Published tutorial",
+                category=self.category,
+                access_type="free",
+                price=0,
+                is_published=True,
+            )
+
+        # Create draft videos.
+        for i in range(2):
+            Video.objects.create(
+                title=f"Draft Video {i}",
+                description="Draft tutorial",
+                category=self.category,
+                access_type="free",
+                price=0,
+                is_published=False,
+            )
+
+    def test_anonymous_user_cannot_access_dashboard(self):
+        response = self.client.get(
+            reverse("videos:admin_dashboard")
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_regular_user_cannot_access_dashboard(self):
+        self.client.login(
+            username="regular_user",
+            password="userpassword123",
+        )
+
+        response = self.client.get(
+            reverse("videos:admin_dashboard")
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_admin_dashboard_displays_correct_statistics(self):
+        self.client.login(
+            username="dashboard_admin",
+            password="adminpassword123",
+        )
+
+        response = self.client.get(
+            reverse("videos:admin_dashboard")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["total_videos"], 5)
+        self.assertEqual(response.context["published_videos"], 3)
+        self.assertEqual(response.context["draft_videos"], 2)
+        self.assertEqual(response.context["total_categories"], 1)
+        self.assertEqual(len(response.context["recent_videos"]), 5)
+
+    def test_add_video_page_loads(self):
+        self.client.login(
+            username="dashboard_admin",
+            password="adminpassword123",
+        )
+
+        response = self.client.get(
+            reverse("videos:add_video")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("form", response.context)
+
+    def test_add_video_invalid_form_displays_error(self):
+        self.client.login(
+            username="dashboard_admin",
+            password="adminpassword123",
+        )
+
+        response = self.client.post(
+            reverse("videos:add_video"),
+            {},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("form", response.context)
+        self.assertTrue(response.context["form"].errors)
+
+    def test_admin_can_successfully_add_video(self):
+        self.client.login(
+            username="dashboard_admin",
+            password="adminpassword123",
+        )
+
+        video_file = SimpleUploadedFile(
+            "python_tutorial.mp4",
+            b"fake video content",
+            content_type="video/mp4",
+        )
+
+        response = self.client.post(
+            reverse("videos:add_video"),
+            {
+                "title": "New Python Tutorial",
+                "description": "Introduction to Python.",
+                "category": self.category.id,
+                "video_file": video_file,
+                "access_type": "free",
+                "price": "0",
+                "is_published": "on",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertTrue(
+            Video.objects.filter(
+                title="New Python Tutorial"
+            ).exists()
+        )
+
+        self.assertContains(
+            response,
+            "a été ajoutée avec succès",
+        )
+
+    def test_edit_video_page_loads(self):
+        video = Video.objects.first()
+
+        self.client.login(
+            username="dashboard_admin",
+            password="adminpassword123",
+        )
+
+        response = self.client.get(
+            reverse("videos:edit_video", args=[video.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("form", response.context)
+        self.assertEqual(response.context["video"], video)
+
+
+def test_admin_can_edit_video(self):
+    video = Video.objects.first()
+
+    self.client.login(
+        username="dashboard_admin",
+        password="adminpassword123",
+    )
+
+    response = self.client.post(
+        reverse("videos:edit_video", args=[video.id]),
+        {
+            "title": "Updated Python Tutorial",
+            "description": "Updated description.",
+            "category": self.category.id,
+            "access_type": "free",
+            "price": "0",
+            "is_published": "on",
+        },
+    )
+
+    video.refresh_from_db()
+
+    self.assertEqual(response.status_code, 302)
+    self.assertEqual(video.title, "Updated Python Tutorial")
+    self.assertEqual(video.description, "Updated description.")
+
+
+def test_admin_can_unpublish_video(self):
+    video = Video.objects.filter(is_published=True).first()
+
+    self.client.login(
+        username="dashboard_admin",
+        password="adminpassword123",
+    )
+
+    response = self.client.post(
+        reverse(
+            "videos:toggle_video_publication",
+            args=[video.id],
+        )
+    )
+
+    video.refresh_from_db()
+
+    self.assertEqual(response.status_code, 302)
+    self.assertFalse(video.is_published)
+
+
+def test_admin_can_publish_video(self):
+    video = Video.objects.filter(is_published=False).first()
+
+    self.client.login(
+        username="dashboard_admin",
+        password="adminpassword123",
+    )
+
+    response = self.client.post(
+        reverse(
+            "videos:toggle_video_publication",
+            args=[video.id],
+        )
+    )
+
+    video.refresh_from_db()
+
+    self.assertEqual(response.status_code, 302)
+    self.assertTrue(video.is_published)
+
+
+def test_publication_toggle_requires_post(self):
+    video = Video.objects.filter(is_published=True).first()
+
+    self.client.login(
+        username="dashboard_admin",
+        password="adminpassword123",
+    )
+
+    response = self.client.get(
+        reverse(
+            "videos:toggle_video_publication",
+            args=[video.id],
+        )
+    )
+
+    self.assertEqual(response.status_code, 405)
+
+
+def test_admin_can_delete_video(self):
+    video = Video.objects.first()
+    video_id = video.id
+
+    self.client.login(
+        username="dashboard_admin",
+        password="adminpassword123",
+    )
+
+    response = self.client.post(
+        reverse(
+            "videos:delete_video",
+            args=[video_id],
+        )
+    )
+
+    self.assertEqual(response.status_code, 302)
+    self.assertFalse(
+        Video.objects.filter(id=video_id).exists()
+    )
+
+
+class CategoryManagementViewTests(TestCase):
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            username="category_admin",
+            email="categoryadmin@example.com",
+            password="adminpassword123",
+        )
+
+        self.client.login(
+            username="category_admin",
+            password="adminpassword123",
+        )
+
+        self.category = Category.objects.create(
+            name="Technology",
+            description="Technology tutorials",
+        )
+
+        self.empty_category = Category.objects.create(
+            name="Business",
+            description="Business tutorials",
+        )
+
+    def test_manage_categories_page_loads(self):
+        response = self.client.get(
+            reverse("videos:manage_categories")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Technology")
+        self.assertContains(response, "Business")
+
+    def test_add_category_page_loads(self):
+        response = self.client.get(
+            reverse("videos:add_category")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("form", response.context)
+
+    def test_admin_can_add_category(self):
+        response = self.client.post(
+            reverse("videos:add_category"),
+            {
+                "name": "Artificial Intelligence",
+                "description": "AI tutorials",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            Category.objects.filter(
+                name="Artificial Intelligence"
+            ).exists()
+        )
+
+    def test_admin_cannot_add_duplicate_category(self):
+        response = self.client.post(
+            reverse("videos:add_category"),
+            {
+                "name": "Technology",
+                "description": "Duplicate category",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Category.objects.count(), 2)
+
+    def test_edit_category_page_loads(self):
+        response = self.client.get(
+            reverse(
+                "videos:edit_category",
+                args=[self.category.id],
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("form", response.context)
+
+    def test_admin_can_edit_category(self):
+        response = self.client.post(
+            reverse(
+                "videos:edit_category",
+                args=[self.category.id],
+            ),
+            {
+                "name": "Software Development",
+                "description": "Programming tutorials",
+            },
+        )
+
+        self.category.refresh_from_db()
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            self.category.name,
+            "Software Development",
+        )
+
+    def test_admin_can_delete_empty_category(self):
+        category_id = self.empty_category.id
+
+        response = self.client.post(
+            reverse(
+                "videos:delete_category",
+                args=[category_id],
+            )
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            Category.objects.filter(id=category_id).exists()
+        )
+
+    def test_admin_cannot_delete_category_with_videos(self):
+        Video.objects.create(
+            title="Python Tutorial",
+            description="Python basics",
+            category=self.category,
+            access_type="free",
+            price=0,
+            is_published=True,
+        )
+
+        response = self.client.post(
+            reverse(
+                "videos:delete_category",
+                args=[self.category.id],
+            )
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            Category.objects.filter(id=self.category.id).exists()
+        )
+
+    def test_delete_category_requires_post(self):
+        response = self.client.get(
+            reverse(
+                "videos:delete_category",
+                args=[self.empty_category.id],
+            )
+        )
+
+        self.assertEqual(response.status_code, 405)
