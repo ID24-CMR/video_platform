@@ -1,11 +1,16 @@
 from decimal import Decimal
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from .models import Category, Video, VideoAccessGrant
+from config import settings
+
+from .models import Category, Video, VideoAccessGrant, Purchase
 from django.core.files.uploadedfile import SimpleUploadedFile
+from unittest.mock import patch
+
+import stripe
 
 
 class CategoryModelTests(TestCase):
@@ -187,6 +192,175 @@ class VideoAccessViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context["has_access"])
+
+    @override_settings(
+        STRIPE_SECRET_KEY="sk_test_fake",
+        STRIPE_CURRENCY="cad",
+        )
+    @patch("videos.views.stripe.checkout.Session.create")
+    def test_user_can_create_checkout_session(self, mock_stripe):
+        mock_stripe.return_value.id = "cs_test_123"
+        mock_stripe.return_value.url = "https://checkout.stripe.com/test"
+
+        self.client.login(
+            username="testuser",
+            password="testpassword123",
+        )
+
+        response = self.client.post(
+            reverse(
+                "videos:create_checkout_session",
+                args=[self.paid_video.id],
+            )
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.url,
+            "https://checkout.stripe.com/test",
+        )
+
+        purchase = Purchase.objects.get(user=self.user)
+
+        self.assertEqual(purchase.status, Purchase.Status.PENDING)
+        self.assertEqual(purchase.amount, Decimal("15.00"))
+        self.assertEqual(purchase.currency, "cad")
+        self.assertEqual(
+            purchase.stripe_checkout_session_id,
+            "cs_test_123",
+        )
+
+        mock_stripe.assert_called_once()
+
+    @patch("videos.views.settings.STRIPE_SECRET_KEY", "")
+    @patch("videos.views.settings.STRIPE_CURRENCY", "cad")
+    def test_checkout_fails_when_stripe_is_not_configured(self):
+        self.client.login(
+            username="testuser",
+            password="testpassword123",
+        )
+
+        response = self.client.post(
+            reverse(
+                "videos:create_checkout_session",
+                args=[self.paid_video.id],
+            )
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Purchase.objects.count(), 0)
+        # self.assertEqual(
+        #     Purchase.objects.count(),
+        #     0,
+        #     msg=(
+        #         f"DEBUG: "
+        #         f"Stripe key={repr(settings.STRIPE_SECRET_KEY)}, "
+        #         f"Response status={response.status_code}, "
+        #         f"Response URL={response.url}, "
+        #         f"Purchase count={Purchase.objects.count()}"
+        #     ),
+        # )
+
+    @patch("videos.views.settings.STRIPE_SECRET_KEY", "sk_test_fake")
+    @patch("videos.views.settings.STRIPE_CURRENCY", "usd")
+    def test_user_cannot_purchase_video_twice(self):
+        VideoAccessGrant.objects.create(
+            user=self.user,
+            video=self.paid_video,
+            source="payment",
+        )
+
+        self.client.login(
+            username="testuser",
+            password="testpassword123",
+        )
+
+        response = self.client.post(
+            reverse(
+                "videos:create_checkout_session",
+                args=[self.paid_video.id],
+            )
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Purchase.objects.count(), 0)
+        
+
+    @override_settings(STRIPE_SECRET_KEY="sk_test_fake",STRIPE_CURRENCY="cad",)
+    @patch("videos.views.stripe.checkout.Session.create")
+    def test_stripe_failure_marks_purchase_as_failed(self, mock_stripe):
+        mock_stripe.side_effect = stripe.StripeError(
+            "Stripe service unavailable"
+        )
+
+        self.client.login(
+            username="testuser",
+            password="testpassword123",
+        )
+
+        response = self.client.post(
+            reverse(
+                "videos:create_checkout_session",
+                args=[self.paid_video.id],
+            )
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        purchase = Purchase.objects.get(user=self.user)
+
+        self.assertEqual(purchase.status, Purchase.Status.FAILED)
+
+    def test_anonymous_user_cannot_start_checkout(self):
+        response = self.client.post(
+            reverse(
+                "videos:create_checkout_session",
+                args=[self.paid_video.id],
+            )
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login/", response.url)
+        self.assertEqual(Purchase.objects.count(), 0)
+
+    def test_checkout_requires_post(self):
+        self.client.login(
+            username="testuser",
+            password="testpassword123",
+        )
+
+        response = self.client.get(
+            reverse(
+                "videos:create_checkout_session",
+                args=[self.paid_video.id],
+            )
+        )
+
+        self.assertEqual(response.status_code, 405)
+
+    @override_settings(
+        STRIPE_SECRET_KEY="sk_test_fake",
+        STRIPE_CURRENCY="cad",
+    )
+    def test_checkout_returns_404_for_unpublished_video(self):
+        self.paid_video.is_published = False
+        self.paid_video.save()
+
+        self.client.login(
+            username="testuser",
+            password="testpassword123",
+        )
+
+        response = self.client.post(
+            reverse(
+                "videos:create_checkout_session",
+                args=[self.paid_video.id],
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(
+            Purchase.objects.count(), 0)
 
 
 class AuthenticationViewTests(TestCase):
