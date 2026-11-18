@@ -6,7 +6,7 @@ from django.urls import reverse
 
 from config import settings
 
-from .models import Category, Video, VideoAccessGrant, Purchase
+from .models import Category, Video, VideoAccessGrant, Purchase, ProcessedStripeEvent
 from django.core.files.uploadedfile import SimpleUploadedFile
 from unittest.mock import patch
 
@@ -1118,3 +1118,266 @@ class CategoryManagementViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 405)
+
+class StripeWebhookTests(TestCase):
+
+    def setUp(self):
+        self.category = Category.objects.create(
+            name="Technology"
+        )
+
+        self.user = User.objects.create_user(
+            username="stripeuser",
+            email="stripe@example.com",
+            password="password123",
+        )
+
+        self.video = Video.objects.create(
+            title="Advanced Django",
+            description="Advanced Django tutorial",
+            category=self.category,
+            access_type="paid",
+            price=Decimal("15.00"),
+            is_published=True,
+        )
+
+        self.purchase = Purchase.objects.create(
+            user=self.user,
+            video=self.video,
+            amount=Decimal("15.00"),
+            currency="cad",
+            status=Purchase.Status.PENDING,
+            stripe_checkout_session_id="cs_test_123",
+        )
+
+    def create_event(
+        self,
+        event_type="checkout.session.completed",
+        event_id="evt_test_123",
+        **session_overrides
+    ):
+        session = {
+            "id": "cs_test_123",
+            "mode": "payment",
+            "payment_status": "paid",
+            "currency": "cad",
+            "amount_total": 1500,
+            "payment_intent": "pi_test_123",
+            "metadata": {
+                "purchase_id": str(self.purchase.id),
+                "user_id": str(self.user.id),
+                "video_id": str(self.video.id),
+            },
+        }
+
+        session.update(session_overrides)
+
+        return {
+            "id": event_id,
+            "type": event_type,
+            "data": {
+                "object": session,
+            },
+        }
+
+    def post_webhook(self, event):
+        with patch(
+            "videos.views.stripe.Webhook.construct_event",
+            return_value=event,
+        ):
+            return self.client.post(
+                reverse("videos:stripe_webhook"),
+                data=b'{"test": "payload"}',
+                content_type="application/json",
+                HTTP_STRIPE_SIGNATURE="test_signature",
+            )
+
+    @patch("videos.views.settings.STRIPE_WEBHOOK_SECRET", "whsec_test")
+    def test_successful_payment_grants_video_access(self):
+        event = self.create_event()
+
+        response = self.post_webhook(event)
+
+        self.purchase.refresh_from_db()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.purchase.status,
+            Purchase.Status.PAID,
+        )
+
+        self.assertIsNotNone(self.purchase.paid_at)
+
+        self.assertTrue(
+            VideoAccessGrant.objects.filter(
+                user=self.user,
+                video=self.video,
+            ).exists()
+        )
+
+        self.assertEqual(
+            ProcessedStripeEvent.objects.count(),
+            1,
+        )
+
+    @patch("videos.views.settings.STRIPE_WEBHOOK_SECRET", "whsec_test")
+    def test_duplicate_event_is_not_processed_twice(self):
+        event = self.create_event()
+
+        first_response = self.post_webhook(event)
+        second_response = self.post_webhook(event)
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 200)
+
+        self.assertEqual(
+            ProcessedStripeEvent.objects.count(),
+            1,
+        )
+
+        self.assertEqual(
+            VideoAccessGrant.objects.filter(
+                user=self.user,
+                video=self.video,
+            ).count(),
+            1,
+        )
+
+    @patch("videos.views.settings.STRIPE_WEBHOOK_SECRET", "whsec_test")
+    def test_unpaid_session_does_not_grant_access(self):
+        event = self.create_event(
+            payment_status="unpaid",
+        )
+
+        response = self.post_webhook(event)
+
+        self.purchase.refresh_from_db()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.purchase.status,
+            Purchase.Status.PENDING,
+        )
+
+        self.assertFalse(
+            VideoAccessGrant.objects.filter(
+                user=self.user,
+                video=self.video,
+            ).exists()
+        )
+
+    @patch("videos.views.settings.STRIPE_WEBHOOK_SECRET", "whsec_test")
+    def test_failed_async_payment_marks_purchase_failed(self):
+        event = self.create_event(
+            event_type="checkout.session.async_payment_failed",
+        )
+
+        response = self.post_webhook(event)
+
+        self.purchase.refresh_from_db()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.purchase.status,
+            Purchase.Status.FAILED,
+        )
+
+        self.assertFalse(
+            VideoAccessGrant.objects.filter(
+                user=self.user,
+                video=self.video,
+            ).exists()
+        )
+
+    @patch("videos.views.settings.STRIPE_WEBHOOK_SECRET", "whsec_test")
+    def test_invalid_signature_is_rejected(self):
+        with patch(
+            "videos.views.stripe.Webhook.construct_event",
+            side_effect=ValueError("Invalid signature"),
+        ):
+            response = self.client.post(
+                reverse("videos:stripe_webhook"),
+                data=b"invalid payload",
+                content_type="application/json",
+                HTTP_STRIPE_SIGNATURE="invalid",
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            ProcessedStripeEvent.objects.count(),
+            0,
+        )
+
+    @patch("videos.views.settings.STRIPE_WEBHOOK_SECRET", "")
+    def test_missing_webhook_secret_returns_500(self):
+        response = self.client.post(
+            reverse("videos:stripe_webhook"),
+            data=b"{}",
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 500)
+
+    @patch("videos.views.settings.STRIPE_WEBHOOK_SECRET", "whsec_test")
+    def test_unsupported_event_is_ignored(self):
+        event = self.create_event(
+            event_type="customer.created",
+        )
+
+        response = self.post_webhook(event)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            ProcessedStripeEvent.objects.count(),
+            0,
+        )
+
+    @patch("videos.views.settings.STRIPE_WEBHOOK_SECRET", "whsec_test")
+    def test_metadata_mismatch_is_rejected(self):
+        event = self.create_event(
+            metadata={
+                "purchase_id": str(self.purchase.id),
+                "user_id": "999999",
+                "video_id": str(self.video.id),
+            }
+        )
+
+        response = self.post_webhook(event)
+
+        self.assertEqual(response.status_code, 400)
+
+        self.purchase.refresh_from_db()
+
+        self.assertEqual(
+            self.purchase.status,
+            Purchase.Status.PENDING,
+        )
+
+        self.assertEqual(
+            ProcessedStripeEvent.objects.count(),
+            0,
+        )
+
+    @patch("videos.views.settings.STRIPE_WEBHOOK_SECRET", "whsec_test")
+    def test_wrong_payment_amount_is_rejected(self):
+        event = self.create_event(
+            amount_total=1000,
+        )
+
+        response = self.post_webhook(event)
+
+        self.assertEqual(response.status_code, 400)
+
+        self.purchase.refresh_from_db()
+
+        self.assertEqual(
+            self.purchase.status,
+            Purchase.Status.PENDING,
+        )
+
+        self.assertFalse(
+            VideoAccessGrant.objects.filter(
+                user=self.user,
+                video=self.video,
+            ).exists()
+        )

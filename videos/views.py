@@ -1,14 +1,13 @@
-from datetime import timezone
+from django.utils import timezone as django_timezone
 from decimal import Decimal
 import logging
 
 from django.contrib import messages
-from django.contrib.auth.decorators import user_passes_test
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from django.contrib.auth import login, logout
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
 from django.utils.http import url_has_allowed_host_and_scheme
 
@@ -27,20 +26,17 @@ from .models import (
 )
 
 from config import settings
-from .models import Purchase, Video, VideoAccessGrant
+from .models import Purchase, Video, VideoAccessGrant, Category, ProcessedStripeEvent
 
 from .forms import RegistrationForm
 
 from django.db.models import Q
-from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
+from django.shortcuts import get_object_or_404
 
 from .forms import CategoryForm, VideoForm
-from .models import Video
 
 from videos.forms import VideoForm
-
-from .models import Category, Video
 
 logger = logging.getLogger(__name__)
 
@@ -727,7 +723,7 @@ def stripe_webhook(request):
                 # purchase back to another state.
                 if purchase.status != Purchase.Status.PAID:
                     purchase.status = Purchase.Status.PAID
-                    purchase.paid_at = timezone.now()
+                    purchase.paid_at = django_timezone.now()
                     purchase.stripe_payment_intent_id = (
                         session.get("payment_intent") or ""
                     )
