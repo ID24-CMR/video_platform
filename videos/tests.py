@@ -361,6 +361,108 @@ class VideoAccessViewTests(TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(
             Purchase.objects.count(), 0)
+    
+        def test_purchase_success_without_session_id_shows_pending_page(self):
+            self.client.login(
+                username="testuser",
+                password="testpassword123",
+            )
+
+            response = self.client.get(
+                reverse("videos:purchase_success")
+            )
+
+            self.assertEqual(response.status_code, 200)
+            self.assertTemplateUsed(
+                response,
+                "videos/purchase_pending.html",
+            )
+
+    def test_purchase_success_with_unknown_session_id_shows_pending_page(self):
+        self.client.login(
+            username="testuser",
+            password="testpassword123",
+        )
+
+        response = self.client.get(
+            reverse("videos:purchase_success"),
+            {"session_id": "cs_unknown_123"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response,
+            "videos/purchase_pending.html",
+        )
+
+    def test_purchase_success_displays_user_purchase(self):
+        purchase = Purchase.objects.create(
+            user=self.user,
+            video=self.paid_video,
+            amount=Decimal("15.00"),
+            currency="cad",
+            status=Purchase.Status.PENDING,
+            stripe_checkout_session_id="cs_test_123",
+        )
+
+        self.client.login(
+            username="testuser",
+            password="testpassword123",
+        )
+
+        response = self.client.get(
+            reverse("videos:purchase_success"),
+            {"session_id": "cs_test_123"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response,
+            "videos/purchase_result.html",
+        )
+        self.assertEqual(
+            response.context["purchase"],
+            purchase,
+        )
+
+    def test_user_cannot_view_another_users_purchase(self):
+        another_user = User.objects.create_user(
+            username="anotheruser",
+            password="anotherpassword123",
+        )
+
+        Purchase.objects.create(
+            user=another_user,
+            video=self.paid_video,
+            amount=Decimal("15.00"),
+            currency="cad",
+            status=Purchase.Status.PAID,
+            stripe_checkout_session_id="cs_private_123",
+        )
+
+        self.client.login(
+            username="testuser",
+            password="testpassword123",
+        )
+
+        response = self.client.get(
+            reverse("videos:purchase_success"),
+            {"session_id": "cs_private_123"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response,
+            "videos/purchase_pending.html",
+        )
+
+    def test_anonymous_user_cannot_access_purchase_success(self):
+        response = self.client.get(
+            reverse("videos:purchase_success"),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login/", response.url)
 
 
 class AuthenticationViewTests(TestCase):
